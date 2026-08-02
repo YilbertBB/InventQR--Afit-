@@ -5,7 +5,9 @@ import 'package:provider/provider.dart';
 import '../models/equipo.dart';
 import '../providers/equipo_provider.dart';
 import '../providers/revision_provider.dart';
+import '../providers/auth_provider.dart';
 import '../utils/qr_parser.dart';
+import '../utils/permission_guard.dart';
 import 'inventory/add_asset_screen.dart';
 import 'inventory/asset_details_screen.dart';
 import 'inventory/transfer_screen.dart';
@@ -48,6 +50,22 @@ class _ScannerScreenState extends State<ScannerScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_puedeEscanear()) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No tiene permisos para escanear QR'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          Navigator.pop(context);
+        }
+        return;
+      }
+    });
+
     _scanLineController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -63,6 +81,22 @@ class _ScannerScreenState extends State<ScannerScreen>
     _scanLineController.dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  bool _puedeEscanear() {
+    final authProvider = context.read<AuthProvider>();
+    return PermissionGuard.canAccess(authProvider.usuarioActual, 'escanear');
+  }
+
+  void _mostrarSinPermisos(String mensaje) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(mensaje),
+        backgroundColor: Colors.orange,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   void _onBarcodeDetected(BuildContext context, BarcodeCapture capture) async {
@@ -90,6 +124,11 @@ class _ScannerScreenState extends State<ScannerScreen>
       // MODO REVISIÓN
       // ============================================
       if (widget.modoRevision) {
+        if (!_puedeEscanear() || !PermissionGuard.canAccess(context.read<AuthProvider>().usuarioActual, 'auditar')) {
+          _mostrarSinPermisos('No tiene permisos para auditar equipos');
+          return;
+        }
+
         final revisionProvider = Provider.of<RevisionProvider>(
           context,
           listen: false,
@@ -132,6 +171,11 @@ class _ScannerScreenState extends State<ScannerScreen>
       // MODO ASIGNACIÓN A TRABAJADOR (NUEVO)
       // ============================================
       else if (widget.modoAsignacion) {
+        if (!PermissionGuard.canAccess(context.read<AuthProvider>().usuarioActual, 'gestion_equipos')) {
+          _mostrarSinPermisos('No tiene permisos para gestionar equipos');
+          return;
+        }
+
         final equipoProvider = Provider.of<EquipoProvider>(
           context,
           listen: false,
@@ -195,6 +239,11 @@ class _ScannerScreenState extends State<ScannerScreen>
       // MODO TRASLADO
       // ============================================
       else if (widget.modoTraslado) {
+        if (!PermissionGuard.canAccess(context.read<AuthProvider>().usuarioActual, 'trasladar')) {
+          _mostrarSinPermisos('No tiene permisos para trasladar equipos');
+          return;
+        }
+
         final equipoProvider = Provider.of<EquipoProvider>(
           context,
           listen: false,

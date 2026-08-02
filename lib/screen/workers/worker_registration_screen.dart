@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../models/trabajador.dart';
 import '../../providers/trabajador_provider.dart';
 import '../../providers/departamento_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../models/departamento.dart';
 import '../../core/app_theme.dart';
 
@@ -115,7 +116,17 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
     super.dispose();
   }
 
+  bool _puedeGestionarTrabajadores() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    return authProvider.tienePermiso('gestion_trabajadores');
+  }
+
   Future<void> _guardarTrabajador() async {
+    if (!_puedeGestionarTrabajadores()) {
+      _mostrarError('No tiene permisos para gestionar trabajadores');
+      return;
+    }
+
     // Validar campos obligatorios
     if (!_validarCampos()) {
       return;
@@ -258,6 +269,32 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
   Widget build(BuildContext context) {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final bool isEdicion = widget.trabajador != null;
+    final bool puedeGestionarTrabajadores = context.watch<AuthProvider>().tienePermiso(
+      'gestion_trabajadores',
+    );
+
+    if (!puedeGestionarTrabajadores) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Trabajadores')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.lock_outline, size: 64, color: Colors.grey),
+                const SizedBox(height: 16),
+                const Text(
+                  'No tiene permisos para gestionar trabajadores',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     // Consumir el DepartamentoProvider
     final deptoProvider = Provider.of<DepartamentoProvider>(context);

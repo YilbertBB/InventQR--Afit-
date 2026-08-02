@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../models/trabajador.dart';
 import '../../providers/trabajador_provider.dart';
 import '../../providers/departamento_provider.dart';
+import '../../providers/auth_provider.dart';
 import 'worker_details_screen.dart';
 import 'worker_registration_screen.dart';
 import '../../core/app_theme.dart';
@@ -155,7 +156,17 @@ class _WorkersScreenState extends State<WorkersScreen>
   }
 
   // Método para editar trabajador
+  bool _puedeGestionarTrabajadores() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    return authProvider.tienePermiso('gestion_trabajadores');
+  }
+
   void _editarTrabajador(Trabajador trabajador) async {
+    if (!_puedeGestionarTrabajadores()) {
+      _mostrarError('No tiene permisos para editar trabajadores');
+      return;
+    }
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -171,6 +182,11 @@ class _WorkersScreenState extends State<WorkersScreen>
 
   // Método para eliminar trabajador
   void _eliminarTrabajador(BuildContext context, Trabajador trabajador) async {
+    if (!_puedeGestionarTrabajadores()) {
+      _mostrarError('No tiene permisos para eliminar trabajadores');
+      return;
+    }
+
     // Mostrar diálogo de confirmación
     final confirmado = await showDialog<bool>(
       context: context,
@@ -252,6 +268,10 @@ class _WorkersScreenState extends State<WorkersScreen>
 
     final trabajadorProvider = Provider.of<TrabajadorProvider>(context);
     final deptoProvider = Provider.of<DepartamentoProvider>(context);
+    final authProvider = context.watch<AuthProvider>();
+    final puedeGestionarTrabajadores = authProvider.tienePermiso(
+      'gestion_trabajadores',
+    );
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -324,7 +344,9 @@ class _WorkersScreenState extends State<WorkersScreen>
       ),
 
       // Floating Action Button
-      floatingActionButton: _buildFloatingActionButton(primaryColor),
+      floatingActionButton: puedeGestionarTrabajadores
+          ? _buildFloatingActionButton(primaryColor)
+          : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
@@ -498,6 +520,7 @@ class _WorkersScreenState extends State<WorkersScreen>
               surfaceColor,
               borderColor,
               textColor,
+              context.watch<AuthProvider>().tienePermiso('gestion_trabajadores'),
             ),
           );
         },
@@ -510,6 +533,7 @@ class _WorkersScreenState extends State<WorkersScreen>
     Color surfaceColor,
     Color borderColor,
     Color textColor,
+    bool puedeGestionarTrabajadores,
   ) {
     final departmentColor = _getColorForDepartment(
       trabajador.departamentoNombre ?? '',
@@ -687,72 +711,140 @@ class _WorkersScreenState extends State<WorkersScreen>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                // Edit Button
-                TextButton.icon(
-                  onPressed: () {
-                    _editarTrabajador(trabajador);
-                  },
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppTheme.primaryColor,
-                    backgroundColor: const Color(
-                      0xFF135BEC,
-                    ).withValues(alpha: 0.05),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                if (puedeGestionarTrabajadores)
+                  TextButton.icon(
+                    onPressed: () {
+                      _editarTrabajador(trabajador);
+                    },
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppTheme.primaryColor,
+                      backgroundColor: const Color(
+                        0xFF135BEC,
+                      ).withValues(alpha: 0.05),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                     ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                  ),
-                  icon: const Icon(
-                    Icons.edit,
-                    size: 18,
-                    color: AppTheme.primaryColor,
-                  ),
-                  label: const Text(
-                    'Editar',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
+                    icon: const Icon(
+                      Icons.edit,
+                      size: 18,
                       color: AppTheme.primaryColor,
                     ),
+                    label: const Text(
+                      'Editar',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
+                  )
+                else
+                  Tooltip(
+                    message: 'No tiene permisos para editar trabajadores',
+                    child: Opacity(
+                      opacity: 0.5,
+                      child: TextButton.icon(
+                        onPressed: null,
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF9CA3AF),
+                          backgroundColor: const Color(0xFFF3F4F6),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                        ),
+                        icon: const Icon(
+                          Icons.edit,
+                          size: 18,
+                          color: Color(0xFF9CA3AF),
+                        ),
+                        label: const Text(
+                          'Editar',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF9CA3AF),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
                 const SizedBox(width: 8),
 
-                // Delete Button
-                TextButton.icon(
-                  onPressed: () {
-                    _eliminarTrabajador(context, trabajador);
-                  },
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppTheme.errorColor,
-                    backgroundColor: const Color(
-                      0xFFEF4444,
-                    ).withValues(alpha: 0.05),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                if (puedeGestionarTrabajadores)
+                  TextButton.icon(
+                    onPressed: () {
+                      _eliminarTrabajador(context, trabajador);
+                    },
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppTheme.errorColor,
+                      backgroundColor: const Color(
+                        0xFFEF4444,
+                      ).withValues(alpha: 0.05),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                     ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                  ),
-                  icon: const Icon(
-                    Icons.delete_outline,
-                    size: 18,
-                    color: AppTheme.errorColor,
-                  ),
-                  label: const Text(
-                    'Eliminar',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      size: 18,
                       color: AppTheme.errorColor,
                     ),
+                    label: const Text(
+                      'Eliminar',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: AppTheme.errorColor,
+                      ),
+                    ),
+                  )
+                else
+                  Tooltip(
+                    message: 'No tiene permisos para eliminar trabajadores',
+                    child: Opacity(
+                      opacity: 0.5,
+                      child: TextButton.icon(
+                        onPressed: null,
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF9CA3AF),
+                          backgroundColor: const Color(0xFFF3F4F6),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                        ),
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          size: 18,
+                          color: Color(0xFF9CA3AF),
+                        ),
+                        label: const Text(
+                          'Eliminar',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF9CA3AF),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
               ],
             ),
           ),

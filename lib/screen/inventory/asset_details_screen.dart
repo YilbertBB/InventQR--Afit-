@@ -11,6 +11,7 @@ import '../../core/app_routes.dart';
 import '../../database/database_helper.dart';
 import '../../models/equipo.dart';
 import '../../providers/asignacion_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/equipo_provider.dart';
 import '../../services/app_storage_service.dart';
 import 'add_asset_screen.dart';
@@ -137,6 +138,10 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
     final surfaceColor = Colors.white;
     final borderColor = const Color(0xFFE5E7EB);
     final textColor = const Color(0xFF111827);
+    final authProvider = context.watch<AuthProvider>();
+    final puedeGestionarInventario = authProvider.tienePermiso(
+      'gestion_equipos',
+    );
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -250,7 +255,11 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                     textColor,
                   ),
                   const SizedBox(height: 24),
-                  _buildStatusActions(equipo, primaryColor),
+                  _buildStatusActions(
+                    equipo,
+                    primaryColor,
+                    puedeGestionarInventario,
+                  ),
                   const SizedBox(height: 24),
                   _buildHistorySection(
                     primaryColor,
@@ -274,6 +283,7 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
             surfaceColor,
             borderColor,
             snapshot.data!,
+            puedeGestionarInventario,
           );
         },
       ),
@@ -761,7 +771,11 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
   // STATUS ACTIONS
   // ============================================
 
-  Widget _buildStatusActions(Equipo equipo, Color primaryColor) {
+  Widget _buildStatusActions(
+    Equipo equipo,
+    Color primaryColor,
+    bool puedeGestionarInventario,
+  ) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
@@ -773,7 +787,9 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                   : Icons.person_add,
               label: equipo.estaAsignado ? 'Desasignar' : 'Asignar',
               color: equipo.estaAsignado ? Colors.orange : Colors.green,
-              onTap: () => _handleAssignment(equipo),
+              onTap: puedeGestionarInventario
+                  ? () => _handleAssignment(equipo)
+                  : () => _mostrarPermisoRequerido(),
             ),
           ),
           const SizedBox(width: 12),
@@ -782,7 +798,9 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
               icon: Icons.swap_horiz,
               label: 'Trasladar',
               color: primaryColor,
-              onTap: () => _handleTransfer(context, equipo),
+              onTap: puedeGestionarInventario
+                  ? () => _handleTransfer(context, equipo)
+                  : () => _mostrarPermisoRequerido(),
             ),
           ),
           const SizedBox(width: 12),
@@ -1405,6 +1423,7 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
     Color surfaceColor,
     Color borderColor,
     Equipo equipo,
+    bool puedeGestionarInventario,
   ) {
     return Container(
       decoration: BoxDecoration(
@@ -1423,7 +1442,7 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
           // Botón EDITAR (izquierda)
           Expanded(
             child: ElevatedButton.icon(
-              onPressed: () => _editAsset(equipo),
+              onPressed: puedeGestionarInventario ? () => _editAsset(equipo) : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: surfaceColor,
                 foregroundColor: primaryColor,
@@ -1847,6 +1866,11 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
   // ============================================
 
   void _handleAssignment(Equipo equipo) async {
+    if (!context.read<AuthProvider>().tienePermiso('gestion_equipos')) {
+      _mostrarPermisoRequerido();
+      return;
+    }
+
     if (equipo.estaAsignado) {
       _showDesasignarDialog(equipo);
     } else {
@@ -1974,6 +1998,11 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
 
   // En AssetDetailScreen
   void _handleTransfer(BuildContext context, Equipo equipo) async {
+    if (!context.read<AuthProvider>().tienePermiso('gestion_equipos')) {
+      _mostrarPermisoRequerido();
+      return;
+    }
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -2079,7 +2108,22 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
     );
   }
 
+  void _mostrarPermisoRequerido() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('No tiene permisos para gestionar inventario'),
+        backgroundColor: Colors.orange,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   void _editAsset(Equipo equipo) async {
+    if (!context.read<AuthProvider>().tienePermiso('gestion_equipos')) {
+      _mostrarPermisoRequerido();
+      return;
+    }
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => AddAssetScreen(equipo: equipo)),

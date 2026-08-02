@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/equipo_provider.dart';
+import '../screen/auth/create_user_screen.dart';
 import '../screen/inventory/add_asset_screen.dart';
 import '../screen/reports/audit_history_screen.dart';
 import '../screen/backup/backup_management_screen.dart';
@@ -22,6 +23,8 @@ import '../screen/splash_screen.dart';
 import '../screen/inventory/transfer_screen.dart';
 import '../screen/auth/user_list_screen.dart';
 import '../screen/welcome_screen.dart';
+import '../providers/auth_provider.dart';
+import '../utils/permission_guard.dart';
 
 class AppRoutes {
   // Ruta inicial
@@ -90,7 +93,7 @@ class AppRoutes {
       selectDepartments: (context) => const SeleccionarDepartamentoPage(),
       auditHistory: (context) => const AuditHistoryScreen(),
       profile: (context) => const ProfileScreen(),
-      // createUser: (context) => const CreateUserScreen(),
+      createUser: (context) => const CreateEditUserScreen(),
       users: (context) => UserListScreen(),
       workers: (context) => WorkersScreen(),
       // workerDetails: (context) => WorkerDetailScreen(),
@@ -118,11 +121,32 @@ class AppRoutes {
     navigatorKey.currentState?.pushNamed(inventory);
   }
 
+  static bool _puedeAcceder(BuildContext context, String permiso) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (PermissionGuard.canAccess(authProvider.usuarioActual, permiso)) {
+      return true;
+    }
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No tiene permisos para esta acción'),
+          backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+
+    return false;
+  }
+
   static void goToAddAsset(BuildContext context) {
+    if (!_puedeAcceder(context, 'gestion_equipos')) return;
     navigatorKey.currentState?.pushNamed(addAsset);
   }
 
   static void goToTrasladarUtencilio(BuildContext context) {
+    if (!_puedeAcceder(context, 'trasladar')) return;
     navigatorKey.currentState?.pushNamed(trasladarUtencilio);
   }
 
@@ -139,6 +163,8 @@ class AppRoutes {
   }
 
   static Future<void> goToScanner(BuildContext context) async {
+    if (!_puedeAcceder(context, 'escanear')) return;
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const ScannerScreen()),
@@ -158,6 +184,7 @@ class AppRoutes {
   }
 
   static void goToImportExcel(BuildContext context) {
+    if (!_puedeAcceder(context, 'importar')) return;
     navigatorKey.currentState?.pushNamed(importExcel);
   }
 

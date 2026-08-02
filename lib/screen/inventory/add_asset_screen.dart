@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/equipo.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/departamento_provider.dart';
 import '../../providers/equipo_provider.dart';
 import '../../providers/trabajador_provider.dart';
@@ -449,6 +450,33 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final puedeGestionarInventario = context.watch<AuthProvider>().tienePermiso(
+      'gestion_equipos',
+    );
+
+    if (!puedeGestionarInventario) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Inventario')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.lock_outline, size: 64, color: Colors.grey),
+                const SizedBox(height: 16),
+                const Text(
+                  'No tiene permisos para gestionar inventario',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Theme(
       data: _darkMode
           ? Theme.of(context).copyWith(brightness: Brightness.dark)

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/excel_import_service.dart';
 import '../../providers/equipo_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../utils/permission_guard.dart';
 import '../../core/app_theme.dart';
 
 class ImportExcelScreen extends StatefulWidget {
@@ -30,7 +32,28 @@ class _ImportExcelScreenState extends State<ImportExcelScreen> {
   @override
   void initState() {
     super.initState();
-    _cargarDepartamentos();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_puedeImportar()) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No tiene permisos para importar equipos'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          Navigator.pop(context);
+        }
+        return;
+      }
+
+      _cargarDepartamentos();
+    });
+  }
+
+  bool _puedeImportar() {
+    final authProvider = context.read<AuthProvider>();
+    return PermissionGuard.canAccess(authProvider.usuarioActual, 'importar');
   }
 
   Future<void> _cargarDepartamentos() async {
@@ -91,6 +114,19 @@ class _ImportExcelScreenState extends State<ImportExcelScreen> {
   }
 
   Future<void> _startImport(BuildContext context) async {
+    if (!_puedeImportar()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No tiene permisos para importar equipos'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
     if (!_fileSelected || _isUploading || _previewData.isEmpty) return;
 
     // Mostrar diálogo de confirmación

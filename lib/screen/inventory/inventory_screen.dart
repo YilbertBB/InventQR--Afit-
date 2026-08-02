@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/app_routes.dart';
 import '../../models/equipo.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/equipo_provider.dart';
 import '../../services/excel_export_service.dart';
 import 'add_asset_screen.dart';
@@ -46,6 +47,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final puedeGestionarInventario = authProvider.tienePermiso('gestion_equipos');
+
     return Theme(
       data: _darkMode
           ? Theme.of(context).copyWith(brightness: Brightness.dark)
@@ -96,7 +100,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             }
 
             if (provider.equipos.isEmpty) {
-              return _buildEmptyState(context);
+              return _buildEmptyState(context, puedeGestionarInventario);
             }
 
             return SafeArea(
@@ -106,7 +110,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   _buildChipsFilter(provider),
                   Expanded(
                     child: provider.equipos.isEmpty
-                        ? _buildEmptyState(context)
+                        ? _buildEmptyState(context, puedeGestionarInventario)
                         : RefreshIndicator(
                             onRefresh: () => provider.cargarEquipos(),
                             color: AppTheme.primaryColor,
@@ -115,7 +119,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               itemCount: provider.equipos.length,
                               itemBuilder: (context, index) {
                                 final equipo = provider.equipos[index];
-                                return _buildAssetCard(equipo, provider);
+                                return _buildAssetCard(
+                                  equipo,
+                                  provider,
+                                  puedeGestionarInventario,
+                                );
                               },
                             ),
                           ),
@@ -126,20 +134,24 @@ class _InventoryScreenState extends State<InventoryScreen> {
           },
         ),
         bottomNavigationBar: _buildBottomNavBar(),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () async {
-            final result = await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const AddAssetScreen()),
-            );
-            if (result == true && context.mounted) {
-              context.read<EquipoProvider>().cargarEquipos();
-            }
-          },
-          backgroundColor: AppTheme.primaryColor,
-          elevation: 8,
-          child: const Icon(Icons.add, size: 30, color: Colors.white),
-        ),
+        floatingActionButton: puedeGestionarInventario
+            ? FloatingActionButton(
+                onPressed: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AddAssetScreen(),
+                    ),
+                  );
+                  if (result == true && context.mounted) {
+                    context.read<EquipoProvider>().cargarEquipos();
+                  }
+                },
+                backgroundColor: AppTheme.primaryColor,
+                elevation: 8,
+                child: const Icon(Icons.add, size: 30, color: Colors.white),
+              )
+            : null,
         floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       ),
     );
@@ -195,7 +207,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
+  Widget _buildEmptyState(
+    BuildContext context,
+    bool puedeGestionarInventario,
+  ) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -229,27 +244,40 @@ class _InventoryScreenState extends State<InventoryScreen> {
             style: TextStyle(fontSize: 14, color: Colors.grey[600]),
           ),
           const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () async {
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AddAssetScreen()),
-              );
-              if (result == true && context.mounted) {
-                context.read<EquipoProvider>().cargarEquipos();
-              }
-            },
-            icon: const Icon(Icons.add),
-            label: const Text('Agregar Primer Equipo'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
+          if (puedeGestionarInventario)
+            ElevatedButton.icon(
+              onPressed: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AddAssetScreen()),
+                );
+                if (result == true && context.mounted) {
+                  context.read<EquipoProvider>().cargarEquipos();
+                }
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Agregar Primer Equipo'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
                 borderRadius: BorderRadius.circular(12),
               ),
+              child: const Text(
+                'No tiene permisos para agregar equipos',
+                style: TextStyle(color: Colors.grey),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -418,7 +446,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  Widget _buildAssetCard(Equipo equipo, EquipoProvider provider) {
+  Widget _buildAssetCard(
+    Equipo equipo,
+    EquipoProvider provider,
+    bool puedeGestionarInventario,
+  ) {
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
@@ -455,7 +487,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
             children: [
               _buildAssetIcon(equipo),
               const SizedBox(width: 16),
-              Expanded(child: _buildAssetInfo(equipo, provider)),
+              Expanded(
+                child: _buildAssetInfo(
+                  equipo,
+                  provider,
+                  puedeGestionarInventario,
+                ),
+              ),
             ],
           ),
         ),
@@ -503,7 +541,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  Widget _buildAssetInfo(Equipo equipo, EquipoProvider provider) {
+  Widget _buildAssetInfo(
+    Equipo equipo,
+    EquipoProvider provider,
+    bool puedeGestionarInventario,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -625,6 +667,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 backgroundColor: _darkMode
                     ? const Color(0xFF334155)
                     : const Color(0xFFF1F5F9),
+                enabled: puedeGestionarInventario,
               ),
             ),
             const SizedBox(width: 8),
@@ -635,6 +678,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
               color: const Color(0xFFD6002E),
               backgroundColor: const Color(0xFFD6002E).withValues(alpha: 0.1),
               borderColor: const Color(0xFFD6002E).withValues(alpha: 0.2),
+              enabled: puedeGestionarInventario,
             ),
           ],
         ),
@@ -649,6 +693,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     required Color color,
     required Color backgroundColor,
     Color? borderColor,
+    bool enabled = true,
   }) {
     return Container(
       height: 32,
@@ -658,7 +703,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         border: borderColor != null ? Border.all(color: borderColor) : null,
       ),
       child: TextButton.icon(
-        onPressed: onPressed,
+        onPressed: enabled ? onPressed : null,
         icon: Icon(icon, size: 14, color: color),
         label: Text(
           label,
@@ -789,7 +834,22 @@ class _InventoryScreenState extends State<InventoryScreen> {
   // ACCIONES DE EQUIPOS
   // ============================================
 
+  void _mostrarPermisoRequerido() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('No tiene permisos para gestionar inventario'),
+        backgroundColor: Colors.orange,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   void _editAsset(BuildContext context, Equipo equipo) async {
+    if (!context.read<AuthProvider>().tienePermiso('gestion_equipos')) {
+      _mostrarPermisoRequerido();
+      return;
+    }
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => AddAssetScreen(equipo: equipo)),
@@ -800,6 +860,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   void _confirmDeleteEquipo(Equipo equipo, EquipoProvider provider) {
+    if (!context.read<AuthProvider>().tienePermiso('gestion_equipos')) {
+      _mostrarPermisoRequerido();
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(

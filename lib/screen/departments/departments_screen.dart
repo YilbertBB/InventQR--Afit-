@@ -5,6 +5,7 @@ import '../../core/app_routes.dart';
 import 'package:flutter/material.dart';
 import '../../models/departamento.dart';
 import '../../providers/departamento_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../core/app_theme.dart';
 
 class DepartmentsScreen extends StatefulWidget {
@@ -87,6 +88,11 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
     BuildContext context,
     Departamento departamento,
   ) async {
+    if (!_puedeGestionarDepartamentos()) {
+      _mostrarError('No tiene permisos para eliminar departamentos');
+      return;
+    }
+
     // Mostrar diálogo de confirmación
     final confirmado = await showDialog<bool>(
       context: context,
@@ -137,16 +143,35 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
     }
   }
 
+  bool _puedeGestionarDepartamentos() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    return authProvider.tienePermiso('gestion_departamentos');
+  }
+
   void _editarDepartamento(Departamento departamento) {
+    if (!_puedeGestionarDepartamentos()) {
+      _mostrarError('No tiene permisos para editar departamentos');
+      return;
+    }
+
     _mostrarModalDepartamento(departamento: departamento);
   }
 
   // Crear nuevo departamento con BottomSheet
   void _crearNuevoDepartamento() {
+    if (!_puedeGestionarDepartamentos()) {
+      _mostrarError('No tiene permisos para crear departamentos');
+      return;
+    }
+
     _mostrarModalDepartamento();
   }
 
   void _mostrarModalDepartamento({Departamento? departamento}) {
+    if (!_puedeGestionarDepartamentos()) {
+      _mostrarError('No tiene permisos para gestionar departamentos');
+      return;
+    }
     final nombreController = TextEditingController();
     bool guardando = false;
     final esEdicion = departamento != null;
@@ -335,6 +360,10 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
     final surfaceColor = Colors.white;
     final borderColor = const Color(0xFFE5E7EB);
     final textColor = const Color(0xFF111827);
+    final authProvider = context.watch<AuthProvider>();
+    final puedeGestionarDepartamentos = authProvider.tienePermiso(
+      'gestion_departamentos',
+    );
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -413,6 +442,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
                     surfaceColor,
                     borderColor,
                     textColor,
+                    puedeGestionarDepartamentos,
                   );
                 },
               ),
@@ -420,7 +450,9 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
           ],
         ),
       ),
-      floatingActionButton: _buildFloatingActionButton(primaryColor),
+      floatingActionButton: puedeGestionarDepartamentos
+          ? _buildFloatingActionButton(primaryColor)
+          : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
@@ -575,6 +607,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
     Color surfaceColor,
     Color borderColor,
     Color textColor,
+    bool puedeGestionarDepartamentos,
   ) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -587,6 +620,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
             surfaceColor,
             borderColor,
             textColor,
+            puedeGestionarDepartamentos,
             () {
               Navigator.push(
                 context,
@@ -609,6 +643,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
     Color surfaceColor,
     Color borderColor,
     Color textColor,
+    bool puedeGestionarDepartamentos,
     VoidCallback ontap,
   ) {
     return GestureDetector(
@@ -749,50 +784,15 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  // Edit Button
-                  TextButton.icon(
-                    onPressed: () {
-                      _editarDepartamento(departamento);
-                    },
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppTheme.primaryColor,
-                      backgroundColor: const Color(
-                        0xFF135BEC,
-                      ).withValues(alpha: 0.05),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                    ),
-                    icon: Icon(
-                      Icons.edit,
-                      size: 18,
-                      color: AppTheme.primaryColor,
-                    ),
-                    label: const Text(
-                      'Editar',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: AppTheme.primaryColor,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-
-                  // Delete Button (solo si no tiene asignaciones)
-                  if (!departamento.tieneEquipos && !departamento.tienePersonal)
+                  if (puedeGestionarDepartamentos)
                     TextButton.icon(
                       onPressed: () {
-                        _eliminarDepartamento(context, departamento);
+                        _editarDepartamento(departamento);
                       },
                       style: TextButton.styleFrom(
-                        foregroundColor: AppTheme.errorColor,
+                        foregroundColor: AppTheme.primaryColor,
                         backgroundColor: const Color(
-                          0xFFEF4444,
+                          0xFF135BEC,
                         ).withValues(alpha: 0.05),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -802,23 +802,127 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
                           vertical: 6,
                         ),
                       ),
-                      icon: const Icon(
-                        Icons.delete_outline,
+                      icon: Icon(
+                        Icons.edit,
                         size: 18,
-                        color: AppTheme.errorColor,
+                        color: AppTheme.primaryColor,
                       ),
                       label: const Text(
-                        'Eliminar',
+                        'Editar',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
-                          color: AppTheme.errorColor,
+                          color: AppTheme.primaryColor,
                         ),
                       ),
                     )
                   else
                     Tooltip(
-                      message: 'No se puede eliminar porque tiene asignaciones',
+                      message: 'No tiene permisos para editar departamentos',
+                      child: Opacity(
+                        opacity: 0.5,
+                        child: TextButton.icon(
+                          onPressed: null,
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFF9CA3AF),
+                            backgroundColor: const Color(0xFFF3F4F6),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                          ),
+                          icon: const Icon(
+                            Icons.edit,
+                            size: 18,
+                            color: Color(0xFF9CA3AF),
+                          ),
+                          label: const Text(
+                            'Editar',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF9CA3AF),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(width: 8),
+
+                  // Delete Button (solo si no tiene asignaciones)
+                  if (puedeGestionarDepartamentos) ...[
+                    if (!departamento.tieneEquipos && !departamento.tienePersonal)
+                      TextButton.icon(
+                        onPressed: () {
+                          _eliminarDepartamento(context, departamento);
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppTheme.errorColor,
+                          backgroundColor: const Color(
+                            0xFFEF4444,
+                          ).withValues(alpha: 0.05),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                        ),
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          size: 18,
+                          color: AppTheme.errorColor,
+                        ),
+                        label: const Text(
+                          'Eliminar',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: AppTheme.errorColor,
+                          ),
+                        ),
+                      )
+                    else
+                      Tooltip(
+                        message: 'No se puede eliminar porque tiene asignaciones',
+                        child: Opacity(
+                          opacity: 0.5,
+                          child: TextButton.icon(
+                            onPressed: null,
+                            style: TextButton.styleFrom(
+                              foregroundColor: const Color(0xFF9CA3AF),
+                              backgroundColor: const Color(0xFFF3F4F6),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                            ),
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              size: 18,
+                              color: Color(0xFF9CA3AF),
+                            ),
+                            label: const Text(
+                              'Eliminar',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF9CA3AF),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ] else
+                    Tooltip(
+                      message: 'No tiene permisos para eliminar departamentos',
                       child: Opacity(
                         opacity: 0.5,
                         child: TextButton.icon(
@@ -923,7 +1027,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: FloatingActionButton.extended(
-        onPressed: _crearNuevoDepartamento, // Cambia esta línea
+        onPressed: _crearNuevoDepartamento,
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),

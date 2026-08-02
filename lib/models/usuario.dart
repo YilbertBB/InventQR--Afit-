@@ -103,6 +103,8 @@ class Usuario {
         'todo',
         'gestion_usuarios',
         'gestion_equipos',
+        'gestion_departamentos',
+        'gestion_trabajadores',
         'exportar',
         'importar',
         'trasladar',
@@ -110,6 +112,7 @@ class Usuario {
       ],
       'supervisor': [
         'gestion_equipos',
+        'gestion_departamentos',
         'exportar',
         'importar',
         'trasladar',

@@ -5,6 +5,8 @@ import '../../models/departamento.dart';
 import '../../providers/departamento_provider.dart';
 import '../../providers/equipo_provider.dart';
 import '../../providers/traslado_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../utils/permission_guard.dart';
 
 class TransferScreen extends StatefulWidget {
   final String? equipoId;
@@ -56,8 +58,21 @@ class _TransferScreenState extends State<TransferScreen> {
   void initState() {
     super.initState();
 
-    // ✅ 1. Cargar departamentos DESPUÉS del build
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_puedeTrasladar()) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No tiene permisos para trasladar equipos'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          Navigator.pop(context);
+        }
+        return;
+      }
+
       _cargarDatosIniciales();
     });
 
@@ -82,6 +97,11 @@ class _TransferScreenState extends State<TransferScreen> {
   void dispose() {
     _reasonController.dispose();
     super.dispose();
+  }
+
+  bool _puedeTrasladar() {
+    final authProvider = context.read<AuthProvider>();
+    return PermissionGuard.canAccess(authProvider.usuarioActual, 'trasladar');
   }
 
   Future<void> _cargarDatosIniciales() async {
@@ -170,6 +190,19 @@ class _TransferScreenState extends State<TransferScreen> {
 
   // Confirmar traslado
   Future<void> _confirmTransfer() async {
+    if (!_puedeTrasladar()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No tiene permisos para trasladar equipos'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
     // Validaciones
     if (_equipoSeleccionado == null) {
       ScaffoldMessenger.of(context).showSnackBar(

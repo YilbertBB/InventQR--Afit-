@@ -261,44 +261,85 @@ class _DashboardScreenState extends State<DashboardScreen> with RootAwareMixin {
     }
   }
 
+  bool _tienePermisoParaAccion(String accion) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    if (authProvider.tienePermiso(accion)) {
+      return true;
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No tiene permisos para esta acción'),
+          backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+
+    return false;
+  }
+
   void _navegarConPermiso(
     String ruta, {
     String accion = 'navegar_sin_modificar',
     Departamento? departamento,
   }) {
-    if (verificarAccionRoot(context, accion)) {
-      switch (ruta) {
-        case 'inventory':
-          AppRoutes.goToInventory(context);
-          break;
-        case 'departments':
-          AppRoutes.goToDepartments(context);
-          break;
-        case 'workers':
-          AppRoutes.goToWorkers(context);
-          break;
-        case 'scanner':
-          AppRoutes.goToScanner(context);
-          break;
-        case 'profile':
-          AppRoutes.goToProfile(context);
-          break;
-        case 'import':
-          AppRoutes.goToImportExcel(context);
-          break;
-        case 'inventoryDepartments':
-          if (departamento == null) return;
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) =>
-                  InventoryDepartments(departamento: departamento),
-            ),
-          );
-          break;
-        default:
-          AppRoutes.goToDashboard(context);
+    if (!verificarAccionRoot(context, accion)) {
+      return;
+    }
+
+    if (accion != 'navegar_sin_modificar' &&
+        accion != 'ver_perfil' &&
+        !_tienePermisoParaAccion(accion)) {
+      return;
+    }
+
+    if (ruta == 'import' || ruta == 'scanner') {
+      final permiso = ruta == 'import' ? 'importar' : 'escanear';
+      if (!_tienePermisoParaAccion(permiso)) {
+        return;
       }
+    }
+
+    if (ruta == 'inventoryDepartments') {
+      if (!_tienePermisoParaAccion('leer')) {
+        return;
+      }
+    }
+
+    switch (ruta) {
+      case 'inventory':
+        AppRoutes.goToInventory(context);
+        break;
+      case 'departments':
+        AppRoutes.goToDepartments(context);
+        break;
+      case 'workers':
+        AppRoutes.goToWorkers(context);
+        break;
+      case 'scanner':
+        AppRoutes.goToScanner(context);
+        break;
+      case 'profile':
+        AppRoutes.goToProfile(context);
+        break;
+      case 'import':
+        AppRoutes.goToImportExcel(context);
+        break;
+      case 'inventoryDepartments':
+        if (departamento == null) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                InventoryDepartments(departamento: departamento),
+          ),
+        );
+        break;
+      default:
+        AppRoutes.goToDashboard(context);
     }
   }
 

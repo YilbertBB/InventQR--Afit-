@@ -811,11 +811,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                       ListTile(
                         leading: const Icon(
-                          Icons.person,
+                          Icons.person_add_alt_1,
                           color: AppTheme.primaryColor,
                         ),
-                        title: const Text('Perfil de Usuario'),
-                        onTap: () => Navigator.pop(context),
+                        title: const Text('Añadir Nuevo Usuario'),
+                        onTap: () {
+                          Navigator.pop(context);
+                          AppRoutes.goToCreateUser(context);
+                        },
                       ),
 
                       ListTile(
@@ -823,7 +826,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Icons.cloud_upload,
                           color: AppTheme.primaryColor,
                         ),
-                        title: const Text('Respaldos en la Nube'),
+                        title: const Text('Respaldar Datos'),
                         subtitle: const Text('Sincronizar y restaurar datos'),
                         trailing: const Icon(
                           Icons.open_in_new,

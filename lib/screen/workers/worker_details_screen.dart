@@ -7,6 +7,7 @@ import '../../models/trabajador.dart';
 import '../../providers/equipo_provider.dart';
 import '../../providers/asignacion_provider.dart';
 import '../../providers/trabajador_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../inventory/asset_details_screen.dart';
 import 'worker_registration_screen.dart';
 import '../../core/app_theme.dart';
@@ -36,6 +37,11 @@ class _WorkerDetailScreenState extends State<WorkerDetailScreen> {
         _cargarEquiposAsignados();
       }
     });
+  }
+
+  bool _puedeGestionarTrabajadores() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    return authProvider.tienePermiso('gestion_trabajadores');
   }
 
   Future<void> _cargarEquiposAsignados() async {
@@ -95,6 +101,9 @@ class _WorkerDetailScreenState extends State<WorkerDetailScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final trabajador = _trabajadorActual;
+    final puedeGestionarTrabajadores = context.watch<AuthProvider>().tienePermiso(
+      'gestion_trabajadores',
+    );
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0A0F14) : Colors.white,
@@ -113,10 +122,11 @@ class _WorkerDetailScreenState extends State<WorkerDetailScreen> {
           icon: const Icon(Icons.arrow_back_ios_new),
         ),
         actions: [
-          IconButton(
-            onPressed: () => _editarTrabajador,
-            icon: Icon(Icons.edit),
-          ),
+          if (puedeGestionarTrabajadores)
+            IconButton(
+              onPressed: () => _editarTrabajador(context),
+              icon: const Icon(Icons.edit),
+            ),
         ],
       ),
       body: SafeArea(
@@ -444,29 +454,54 @@ class _WorkerDetailScreenState extends State<WorkerDetailScreen> {
                 icon: Icon(Icons.more_vert, color: Colors.grey[400]),
                 onSelected: (value) async {
                   if (value == 'editar') {
+                    if (!_puedeGestionarTrabajadores()) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('No tiene permisos para editar trabajadores'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
                     await _editarTrabajador(context);
                   } else if (value == 'cambiar_estado') {
                     _mostrarDialogoCambiarEstado();
                   } else if (value == 'eliminar') {
+                    if (!_puedeGestionarTrabajadores()) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('No tiene permisos para eliminar trabajadores'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
                     _mostrarDialogoEliminar();
                   }
                 },
                 itemBuilder: (BuildContext context) {
-                  return [
-                    const PopupMenuItem<String>(
-                      value: 'editar',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.edit,
-                            size: 20,
-                            color: AppTheme.primaryColor,
-                          ),
-                          SizedBox(width: 8),
-                          Text('Editar'),
-                        ],
+                  final items = <PopupMenuEntry<String>>[];
+
+                  if (puedeGestionarTrabajadores) {
+                    items.add(
+                      const PopupMenuItem<String>(
+                        value: 'editar',
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.edit,
+                              size: 20,
+                              color: AppTheme.primaryColor,
+                            ),
+                            SizedBox(width: 8),
+                            Text('Editar'),
+                          ],
+                        ),
                       ),
-                    ),
+                    );
+                  }
+
+                  items.add(
                     PopupMenuItem<String>(
                       value: 'cambiar_estado',
                       child: Row(
@@ -487,17 +522,24 @@ class _WorkerDetailScreenState extends State<WorkerDetailScreen> {
                         ],
                       ),
                     ),
-                    const PopupMenuItem<String>(
-                      value: 'eliminar',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete, size: 20, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text('Eliminar'),
-                        ],
+                  );
+
+                  if (puedeGestionarTrabajadores) {
+                    items.add(
+                      const PopupMenuItem<String>(
+                        value: 'eliminar',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, size: 20, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Eliminar'),
+                          ],
+                        ),
                       ),
-                    ),
-                  ];
+                    );
+                  }
+
+                  return items;
                 },
               ),
             ),
