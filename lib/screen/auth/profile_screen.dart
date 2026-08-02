@@ -644,14 +644,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Cancelar'),
+                    child: const Text('Cancelar',style: TextStyle(color: Colors.black),),
                   ),
                   ElevatedButton(
                     onPressed: () => Navigator.pop(context, true),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.errorColor,
                     ),
-                    child: const Text('Sí, cerrar sesión'),
+                    child: const Text('Sí, cerrar sesión',style: TextStyle(color: Colors.white),),
                   ),
                 ],
               ),
@@ -718,7 +718,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               Icon(
                 Icons.chevron_right,
-                color: action.title == 'Cerrar Sesi?n'
+                color: action.title == 'Cerrar Sesión'
                     ? AppTheme.errorColor
                     : const Color(0xFF9CA3AF),
               ),
@@ -872,14 +872,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 TextButton(
                                   onPressed: () =>
                                       Navigator.pop(context, false),
-                                  child: const Text('Cancelar'),
+                                  child: const Text('Cancelar',style: TextStyle(color: Colors.black),),
                                 ),
                                 ElevatedButton(
                                   onPressed: () => Navigator.pop(context, true),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: AppTheme.errorColor,
                                   ),
-                                  child: const Text('Sí, cerrar sesión'),
+                                  child: const Text('Sí, cerrar sesión',style: TextStyle(color: Colors.white),),
                                 ),
                               ],
                             ),

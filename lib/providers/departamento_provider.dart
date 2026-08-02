@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sqflite/sqflite.dart';
 import '../database/database_helper.dart';
 import '../models/departamento.dart';
 
@@ -122,9 +123,73 @@ class DepartamentoProvider with ChangeNotifier {
 
   Future<bool> eliminarDepartamento(String id) async {
     try {
+      if (id == 'sin-departamento') {
+        throw Exception('No se puede eliminar el departamento predeterminado.');
+      }
+
       final db = await _dbHelper.database;
 
-      await db.delete('departamentos', where: 'id = ?', whereArgs: [id]);
+      final equiposCount = Sqflite.firstIntValue(
+            await db.rawQuery(
+              'SELECT COUNT(*) AS count FROM equipos WHERE departamento_id = ? AND activo = 1',
+              [id],
+            ),
+          ) ??
+          0;
+      if (equiposCount > 0) {
+        throw Exception(
+          'No se puede eliminar el departamento porque tiene equipos asignados. Primero reubique los equipos.',
+        );
+      }
+
+      final trabajadoresCount = Sqflite.firstIntValue(
+            await db.rawQuery(
+              'SELECT COUNT(*) AS count FROM trabajadores WHERE departamento_id = ? AND activo = 1',
+              [id],
+            ),
+          ) ??
+          0;
+      if (trabajadoresCount > 0) {
+        throw Exception(
+          'No se puede eliminar el departamento porque tiene trabajadores asignados. Primero reubique los trabajadores.',
+        );
+      }
+
+      final trasladosCount = Sqflite.firstIntValue(
+            await db.rawQuery(
+              'SELECT COUNT(*) AS count FROM traslados WHERE desde_departamento_id = ? OR hacia_departamento_id = ?',
+              [id, id],
+            ),
+          ) ??
+          0;
+      if (trasladosCount > 0) {
+        throw Exception(
+          'No se puede eliminar el departamento porque está vinculado a traslados registrados.',
+        );
+      }
+
+      final revisionesCount = Sqflite.firstIntValue(
+            await db.rawQuery(
+              'SELECT COUNT(*) AS count FROM revisiones WHERE departamento_id = ?',
+              [id],
+            ),
+          ) ??
+          0;
+      if (revisionesCount > 0) {
+        throw Exception(
+          'No se puede eliminar el departamento porque tiene revisiones asociadas.',
+        );
+      }
+
+      final eliminados = await db.delete(
+        'departamentos',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+
+      if (eliminados == 0) {
+        throw Exception('No se encontró el departamento para eliminar.');
+      }
 
       // Recargar la lista
       await cargarDepartamentos();

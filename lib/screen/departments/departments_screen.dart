@@ -136,7 +136,9 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
         _mostrarExito('Departamento eliminado exitosamente');
         // La lista ya se recarga automáticamente en el provider
       } else {
-        _mostrarError('Error al eliminar departamento');
+        _mostrarError(
+          provider.error ?? 'Error al eliminar departamento',
+        );
       }
     } catch (e) {
       _mostrarError('Error al eliminar departamento: $e');
