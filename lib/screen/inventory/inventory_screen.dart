@@ -99,9 +99,23 @@ class _InventoryScreenState extends State<InventoryScreen> {
               return _buildErrorState(provider);
             }
 
-            if (provider.equipos.isEmpty) {
-              return _buildEmptyState(context, puedeGestionarInventario);
-            }
+         if (provider.equipos.isEmpty && provider.tieneFiltrosActivos) {
+  // Filtro sin resultados - MANTIENE la barra y chips
+  return SafeArea(
+    child: Column(
+      children: [
+        _buildSearchBar(provider),
+        _buildChipsFilter(provider),
+        Expanded(
+          child: _buildNoResultsState(context, puedeGestionarInventario),
+        ),
+      ],
+    ),
+  );
+} else if (provider.equipos.isEmpty) {
+  // Sin equipos en la BD - MUESTRA el estado vacío completo
+  return _buildEmptyState(context, puedeGestionarInventario);
+}
 
             return SafeArea(
               child: Column(
@@ -283,6 +297,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
+
   Widget _buildSearchBar(EquipoProvider provider) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -445,6 +460,58 @@ class _InventoryScreenState extends State<InventoryScreen> {
       ),
     );
   }
+
+Widget _buildNoResultsState(BuildContext context, bool puedeGestionarInventario) {
+  return Center(
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: 100,
+          height: 100,
+          decoration: BoxDecoration(
+            color: Colors.grey.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.filter_alt_off,
+            size: 50,
+            color: Colors.grey,
+          ),
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'No hay equipos que coincidan',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1E293B),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Prueba con otros filtros o términos de búsqueda',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+        ),
+        const SizedBox(height: 16),
+        // Botón pequeño para limpiar filtros (opcional)
+        TextButton.icon(
+          onPressed: () {
+            context.read<EquipoProvider>().limpiarFiltros();
+            // Resetear el chip seleccionado a "Todos"
+            setState(() => _selectedChip = 0);
+          },
+          icon: const Icon(Icons.clear_all, size: 18),
+          label: const Text('Limpiar filtros'),
+          style: TextButton.styleFrom(
+            foregroundColor: AppTheme.primaryColor,
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildAssetCard(
     Equipo equipo,

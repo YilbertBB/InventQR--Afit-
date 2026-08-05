@@ -18,6 +18,7 @@ class DepartamentoProvider with ChangeNotifier {
 
   Future<void> cargarDepartamentos() async {
     try {
+      _error = null;
       _cargando = true;
       notifyListeners();
 
@@ -88,7 +89,7 @@ class DepartamentoProvider with ChangeNotifier {
 
       await db.insert('departamentos', nuevoDepartamento.toMap());
 
-      // Recargar la lista
+      _error = null;
       await cargarDepartamentos();
 
       return true;
@@ -110,7 +111,7 @@ class DepartamentoProvider with ChangeNotifier {
         whereArgs: [departamento.id],
       );
 
-      // Recargar la lista
+      _error = null;
       await cargarDepartamentos();
 
       return true;
@@ -121,77 +122,134 @@ class DepartamentoProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> eliminarDepartamento(String id) async {
+  Future<bool> eliminarDepartamento(String id, {bool forzar = false}) async {
     try {
+      _error = null;
+
       if (id == 'sin-departamento') {
         throw Exception('No se puede eliminar el departamento predeterminado.');
       }
 
       final db = await _dbHelper.database;
 
-      final equiposCount = Sqflite.firstIntValue(
-            await db.rawQuery(
-              'SELECT COUNT(*) AS count FROM equipos WHERE departamento_id = ? AND activo = 1',
-              [id],
-            ),
-          ) ??
-          0;
-      if (equiposCount > 0) {
-        throw Exception(
-          'No se puede eliminar el departamento porque tiene equipos asignados. Primero reubique los equipos.',
+      if (!forzar) {
+        final equiposCount = Sqflite.firstIntValue(
+              await db.rawQuery(
+                'SELECT COUNT(*) AS count FROM equipos WHERE departamento_id = ? AND activo = 1',
+                [id],
+              ),
+            ) ??
+            0;
+        if (equiposCount > 0) {
+          throw Exception(
+            'No se puede eliminar el departamento porque tiene equipos asignados. Primero reubique los equipos.',
+          );
+        }
+
+        final trabajadoresCount = Sqflite.firstIntValue(
+              await db.rawQuery(
+                'SELECT COUNT(*) AS count FROM trabajadores WHERE departamento_id = ? AND activo = 1',
+                [id],
+              ),
+            ) ??
+            0;
+        if (trabajadoresCount > 0) {
+          throw Exception(
+            'No se puede eliminar el departamento porque tiene trabajadores asignados. Primero reubique los trabajadores.',
+          );
+        }
+
+        final trasladosCount = Sqflite.firstIntValue(
+              await db.rawQuery(
+                'SELECT COUNT(*) AS count FROM traslados WHERE desde_departamento_id = ? OR hacia_departamento_id = ?',
+                [id, id],
+              ),
+            ) ??
+            0;
+        if (trasladosCount > 0) {
+          throw Exception(
+            'No se puede eliminar el departamento porque está vinculado a traslados registrados.',
+          );
+        }
+
+        final revisionesCount = Sqflite.firstIntValue(
+              await db.rawQuery(
+                'SELECT COUNT(*) AS count FROM revisiones WHERE departamento_id = ?',
+                [id],
+              ),
+            ) ??
+            0;
+        if (revisionesCount > 0) {
+          throw Exception(
+            'No se puede eliminar el departamento porque tiene revisiones asociadas.',
+          );
+        }
+      }
+
+      await db.transaction((txn) async {
+        if (forzar) {
+          await txn.update(
+            'equipos',
+            {
+              'departamento_id': 'sin-departamento',
+              'departamento_nombre': 'Sin departamento',
+            },
+            where: 'departamento_id = ?',
+            whereArgs: [id],
+          );
+
+          await txn.update(
+            'trabajadores',
+            {
+              'departamento_id': 'sin-departamento',
+              'departamento_nombre': 'Sin departamento',
+            },
+            where: 'departamento_id = ?',
+            whereArgs: [id],
+          );
+
+          await txn.update(
+            'traslados',
+            {
+              'desde_departamento_id': 'sin-departamento',
+              'desde_departamento_nombre': 'Sin departamento',
+            },
+            where: 'desde_departamento_id = ?',
+            whereArgs: [id],
+          );
+
+          await txn.update(
+            'traslados',
+            {
+              'hacia_departamento_id': 'sin-departamento',
+              'hacia_departamento_nombre': 'Sin departamento',
+            },
+            where: 'hacia_departamento_id = ?',
+            whereArgs: [id],
+          );
+
+          await txn.update(
+            'revisiones',
+            {
+              'departamento_id': 'sin-departamento',
+              'departamento_nombre': 'Sin departamento',
+            },
+            where: 'departamento_id = ?',
+            whereArgs: [id],
+          );
+        }
+
+        final eliminados = await txn.delete(
+          'departamentos',
+          where: 'id = ?',
+          whereArgs: [id],
         );
-      }
 
-      final trabajadoresCount = Sqflite.firstIntValue(
-            await db.rawQuery(
-              'SELECT COUNT(*) AS count FROM trabajadores WHERE departamento_id = ? AND activo = 1',
-              [id],
-            ),
-          ) ??
-          0;
-      if (trabajadoresCount > 0) {
-        throw Exception(
-          'No se puede eliminar el departamento porque tiene trabajadores asignados. Primero reubique los trabajadores.',
-        );
-      }
+        if (eliminados == 0) {
+          throw Exception('No se encontró el departamento para eliminar.');
+        }
+      });
 
-      final trasladosCount = Sqflite.firstIntValue(
-            await db.rawQuery(
-              'SELECT COUNT(*) AS count FROM traslados WHERE desde_departamento_id = ? OR hacia_departamento_id = ?',
-              [id, id],
-            ),
-          ) ??
-          0;
-      if (trasladosCount > 0) {
-        throw Exception(
-          'No se puede eliminar el departamento porque está vinculado a traslados registrados.',
-        );
-      }
-
-      final revisionesCount = Sqflite.firstIntValue(
-            await db.rawQuery(
-              'SELECT COUNT(*) AS count FROM revisiones WHERE departamento_id = ?',
-              [id],
-            ),
-          ) ??
-          0;
-      if (revisionesCount > 0) {
-        throw Exception(
-          'No se puede eliminar el departamento porque tiene revisiones asociadas.',
-        );
-      }
-
-      final eliminados = await db.delete(
-        'departamentos',
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-
-      if (eliminados == 0) {
-        throw Exception('No se encontró el departamento para eliminar.');
-      }
-
-      // Recargar la lista
       await cargarDepartamentos();
 
       return true;

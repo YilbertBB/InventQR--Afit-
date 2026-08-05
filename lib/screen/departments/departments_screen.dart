@@ -28,7 +28,9 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _cargarDepartamentos();
+      if (mounted) {
+        _cargarDepartamentos();
+      }
     });
 
     _searchController.addListener(_filtrarDepartamentos);
@@ -41,7 +43,6 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
         error = null;
       });
 
-      // ✅ USAR EL PROVIDER
       final provider = Provider.of<DepartamentoProvider>(
         context,
         listen: false,
@@ -50,12 +51,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
       await provider.cargarDepartamentos();
 
       if (mounted) {
-        setState(() {
-          // ✅ provider.departamentos YA FILTRA 'sin-departamento'
-          _departamentos = provider.departamentos;
-          _departamentosFiltrados = provider.departamentos;
-          cargando = false;
-        });
+        _sincronizarDepartamentosDesdeProvider(provider);
       }
     } catch (e) {
       setState(() {
@@ -63,6 +59,22 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
         cargando = false;
       });
     }
+  }
+
+  void _sincronizarDepartamentosDesdeProvider(DepartamentoProvider provider) {
+    final departamentos = provider.departamentos;
+    final busqueda = _searchController.text.toLowerCase().trim();
+
+    setState(() {
+      _departamentos = departamentos;
+      _departamentosFiltrados = busqueda.isEmpty
+          ? departamentos
+          : departamentos.where((departamento) {
+              return departamento.nombre.toLowerCase().contains(busqueda);
+            }).toList();
+      cargando = false;
+      error = provider.error;
+    });
   }
 
   void _filtrarDepartamentos() {
@@ -93,10 +105,9 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
       return;
     }
 
-    // Mostrar diálogo de confirmación
     final confirmado = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Eliminar Departamento'),
         content: Text(
           '¿Estás seguro de eliminar el departamento "${departamento.nombre}"?\n\n'
@@ -104,11 +115,11 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Cancelar'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogContext, true),
             style: TextButton.styleFrom(
               foregroundColor: Colors.white,
               backgroundColor: AppTheme.errorColor,
@@ -122,7 +133,6 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
     if (confirmado != true) return;
 
     try {
-      // ✅ USAR EL PROVIDER EN VEZ DE DB DIRECTA
       if (!context.mounted) return;
 
       final provider = Provider.of<DepartamentoProvider>(
@@ -133,16 +143,65 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
       final exito = await provider.eliminarDepartamento(departamento.id);
 
       if (exito) {
+        _sincronizarDepartamentosDesdeProvider(provider);
         _mostrarExito('Departamento eliminado exitosamente');
-        // La lista ya se recarga automáticamente en el provider
       } else {
-        _mostrarError(
-          provider.error ?? 'Error al eliminar departamento',
-        );
+        final mensaje = provider.error ?? 'Error al eliminar departamento';
+
+        if (_esErrorDeRevision(mensaje)) {
+          final borrarFuerza = await showDialog<bool>(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              title: const Text('Revisión en curso'),
+              content: Text(
+                'El departamento "${departamento.nombre}" tiene una revisión asociada.\n\n'
+                'Puedes borrar el departamento de forma forzada o cancelar la operación.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppTheme.errorColor,
+                  ),
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: const Text('Borrar a la fuerza'),
+                ),
+              ],
+            ),
+          );
+
+          if (borrarFuerza == true) {
+            final exitoFuerza = await provider.eliminarDepartamento(
+              departamento.id,
+              forzar: true,
+            );
+
+            if (exitoFuerza) {
+              _sincronizarDepartamentosDesdeProvider(provider);
+              _mostrarExito('Departamento eliminado a la fuerza');
+            } else {
+              _mostrarError(
+                provider.error ?? 'No se pudo eliminar el departamento',
+              );
+            }
+          } else {
+            _mostrarError('Se canceló la eliminación');
+          }
+        } else {
+          _mostrarError(mensaje);
+        }
       }
     } catch (e) {
       _mostrarError('Error al eliminar departamento: $e');
     }
+  }
+
+  bool _esErrorDeRevision(String mensaje) {
+    final texto = mensaje.toLowerCase();
+    return texto.contains('revisión') || texto.contains('revision');
   }
 
   bool _puedeGestionarDepartamentos() {
@@ -291,7 +350,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
                                       ? 'Departamento actualizado'
                                       : 'Departamento creado',
                                 );
-                                _cargarDepartamentos();
+                                await _cargarDepartamentos();
                               } else {
                                 _mostrarError(
                                   provider.error ??
@@ -366,6 +425,15 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
     final puedeGestionarDepartamentos = authProvider.tienePermiso(
       'gestion_departamentos',
     );
+    final provider = context.watch<DepartamentoProvider>();
+
+    if (!provider.cargando && provider.error == null && _departamentos.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _sincronizarDepartamentosDesdeProvider(provider);
+        }
+      });
+    }
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -422,8 +490,8 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  if (provider.error != null) {
-                    return _buildErrorView(provider.error!);
+                  if (error != null) {
+                    return _buildErrorView(error!);
                   }
 
                   // Filtrar por búsqueda
@@ -854,75 +922,40 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
                     ),
                   const SizedBox(width: 8),
 
-                  // Delete Button (solo si no tiene asignaciones)
-                  if (puedeGestionarDepartamentos) ...[
-                    if (!departamento.tieneEquipos && !departamento.tienePersonal)
-                      TextButton.icon(
-                        onPressed: () {
-                          _eliminarDepartamento(context, departamento);
-                        },
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppTheme.errorColor,
-                          backgroundColor: const Color(
-                            0xFFEF4444,
-                          ).withValues(alpha: 0.05),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
+                  // Delete Button
+                  if (puedeGestionarDepartamentos)
+                    TextButton.icon(
+                      onPressed: () {
+                        _eliminarDepartamento(context, departamento);
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppTheme.errorColor,
+                        backgroundColor: const Color(0xFFEF4444).withValues(
+                          alpha: 0.05,
                         ),
-                        icon: const Icon(
-                          Icons.delete_outline,
-                          size: 18,
-                          color: AppTheme.errorColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        label: const Text(
-                          'Eliminar',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: AppTheme.errorColor,
-                          ),
-                        ),
-                      )
-                    else
-                      Tooltip(
-                        message: 'No se puede eliminar porque tiene asignaciones',
-                        child: Opacity(
-                          opacity: 0.5,
-                          child: TextButton.icon(
-                            onPressed: null,
-                            style: TextButton.styleFrom(
-                              foregroundColor: const Color(0xFF9CA3AF),
-                              backgroundColor: const Color(0xFFF3F4F6),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                            ),
-                            icon: const Icon(
-                              Icons.delete_outline,
-                              size: 18,
-                              color: Color(0xFF9CA3AF),
-                            ),
-                            label: const Text(
-                              'Eliminar',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF9CA3AF),
-                              ),
-                            ),
-                          ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
                         ),
                       ),
-                  ] else
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        size: 18,
+                        color: AppTheme.errorColor,
+                      ),
+                      label: const Text(
+                        'Eliminar',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.errorColor,
+                        ),
+                      ),
+                    )
+                  else
                     Tooltip(
                       message: 'No tiene permisos para eliminar departamentos',
                       child: Opacity(

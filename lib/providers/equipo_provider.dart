@@ -23,15 +23,8 @@ class EquipoProvider extends ChangeNotifier {
   // GETTERS
   // ============================================
 
-  // List<Equipo> get equipos {
-  //   debugPrint(
-  //     'ðŸ” get equipos llamado en instancia $_instanceId - devolviendo ${_equipos.length}',
-  //   );
-  //   return _filtrosActivos ? _equiposFiltrados : _equipos;
-  // }
-
   List<Equipo> get equipos {
-    if (_filtrosActivos && _equiposFiltrados.isNotEmpty) {
+    if (_filtrosActivos) {
       return _equiposFiltrados;
     }
     return _equipos;
@@ -39,6 +32,7 @@ class EquipoProvider extends ChangeNotifier {
 
   String? get error => _error;
   bool get cargando => _cargando;
+bool get tieneFiltrosActivos => _filtrosActivos;
   bool get _filtrosActivos =>
       _filtroEstado != null ||
       _filtroTipo != null ||
@@ -330,22 +324,26 @@ class EquipoProvider extends ChangeNotifier {
         : _equipos;
 
     _equiposFiltrados = base.where((equipo) {
-      // Filtro por estado
-      if (_filtroEstado != null &&
-          _filtroEstado!.toLowerCase() != 'todos' &&
-          equipo.estado.toLowerCase() != _filtroEstado!.toLowerCase()) {
+      final estadoFiltro = _filtroEstado?.trim().toLowerCase();
+      final tipoFiltro = _filtroTipo?.trim().toLowerCase();
+      final departamentoFiltro = _filtroDepartamento?.trim();
+
+      if (estadoFiltro != null &&
+          estadoFiltro.isNotEmpty &&
+          estadoFiltro != 'todos' &&
+          (equipo.estado.trim().toLowerCase()) != estadoFiltro) {
         return false;
       }
 
-      // Filtro por tipo
-      if (_filtroTipo != null &&
-          equipo.tipo.toLowerCase() != _filtroTipo!.toLowerCase()) {
+      if (tipoFiltro != null &&
+          tipoFiltro.isNotEmpty &&
+          (equipo.tipo.trim().toLowerCase()) != tipoFiltro) {
         return false;
       }
 
-      // Filtro por departamento
-      if (_filtroDepartamento != null &&
-          equipo.departamentoId != _filtroDepartamento) {
+      if (departamentoFiltro != null &&
+          departamentoFiltro.isNotEmpty &&
+          equipo.departamentoId != departamentoFiltro) {
         return false;
       }
 
